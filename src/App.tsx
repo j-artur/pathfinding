@@ -178,7 +178,7 @@ const App: Component = () => {
                     if (getTile(pos) !== Tile.Goal) setTile(pos, Tile.Path)
                     else setTile(pos, Tile.ReachedGoal)
                     walk()
-                  }, sps())
+                  }, 1000 / sps())
                 } else setRunning(false)
               }
 
