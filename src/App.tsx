@@ -44,11 +44,14 @@ const [width, setWidth] = createSignal(16)
 const [height, setHeight] = createSignal(16)
 const [player, setPlayer] = createSignal<Item>('Unset')
 const [goal, setGoal] = createSignal<Item>('Unset')
-const tiles = () => new Array(width()).fill(new Array(height()).fill(Tile.Empty)) as Tile[][]
+const emptyTiles = () => new Array(height()).fill(new Array(width()).fill(Tile.Empty)) as Tile[][]
 const getTile = ([x, y]: Pos) => state.tiles[y]?.[x] ?? Tile.Wall
-const setTile = ([x, y]: Pos, t: Tile) => setState('tiles', g => set(g, y, l => set(l, x, t)))
+const setTile = ([x, y]: Pos, t: Tile) => {
+  console.log(x, y)
+  setState('tiles', set(state.tiles, y, set(state.tiles[y]!, x, t)))
+}
 const resetGrid = () => {
-  setState({ width: width(), height: height(), tiles: tiles() })
+  setState({ width: width(), height: height(), tiles: emptyTiles() })
   setPlayer('Unset')
   setGoal('Unset')
 }
@@ -80,7 +83,7 @@ const App: Component = () => {
 
   const handleMouse = (e: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => {
     e.preventDefault()
-    if (player()?.[0] !== 'Set' || goal()?.[0] !== 'Set') return
+    if (player() === 'Holding' || goal() === 'Holding') return
 
     const { top, left, width, height } = e.currentTarget.getBoundingClientRect()
     const { clientX: cx, clientY: cy } = e
@@ -90,8 +93,12 @@ const App: Component = () => {
     const y = Math.floor((cy - top) / (height / state.height))
     const x = Math.floor((cx - left) / (width / state.width))
 
-    if (e.buttons === 1) setState('tiles', tiles => set(tiles, y, set(tiles[y]!, x, Tile.Wall)))
-    if (e.buttons === 2) setState('tiles', tiles => set(tiles, y, set(tiles[y]!, x, Tile.Empty)))
+    const tile = getTile([x, y])
+
+    if (tile !== Tile.Player && tile !== Tile.Goal) {
+      if (e.buttons === 1) setTile([x, y], Tile.Wall)
+      if (e.buttons === 2) setTile([x, y], Tile.Empty)
+    }
   }
 
   return (
@@ -201,8 +208,8 @@ const App: Component = () => {
           >
             <div
               style={{
-                'width': `calc(75vh / ${width()})`,
-                'height': `calc(75vh / ${height()})`,
+                'width': `calc(75vh / ${state.width})`,
+                'height': `calc(75vh / ${state.height})`,
                 'background-color': colors[Tile.Player],
                 'border-radius': '50%',
               }}
@@ -250,8 +257,8 @@ const App: Component = () => {
           >
             <div
               style={{
-                'width': `calc(75vh / ${width()})`,
-                'height': `calc(75vh / ${height()})`,
+                'width': `calc(75vh / ${state.width})`,
+                'height': `calc(75vh / ${state.height})`,
                 'background-color': colors[Tile.Goal],
                 'border-radius': '50%',
               }}
