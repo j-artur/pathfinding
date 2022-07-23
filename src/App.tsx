@@ -46,30 +46,33 @@ const [player, setPlayer] = createSignal<Item>('Unset')
 const [goal, setGoal] = createSignal<Item>('Unset')
 const emptyTiles = () => new Array(height()).fill(new Array(width()).fill(Tile.Empty)) as Tile[][]
 const getTile = ([x, y]: Pos) => state.tiles[y]?.[x] ?? Tile.Wall
-const setTile = ([x, y]: Pos, t: Tile) => {
-  console.log(x, y)
+const setTile = ([x, y]: Pos, t: Tile) =>
   setState('tiles', set(state.tiles, y, set(state.tiles[y]!, x, t)))
-}
+const [isGridUsed, setGridUsed] = createSignal(false)
 const resetGrid = () => {
   setState({ width: width(), height: height(), tiles: emptyTiles() })
-  setPlayer('Unset')
-  setGoal('Unset')
+  setGridUsed(false)
+  if (player()[0] === 'Set') setTile((player() as ['Set', Pos])[1], Tile.Player)
+  if (goal()[0] === 'Set') setTile((goal() as ['Set', Pos])[1], Tile.Goal)
 }
 
 const allowed = (p: Pos): boolean => getTile(p) !== Tile.Wall && getTile(p) !== Tile.Player
 
-const findPath = (start: Pos): [boolean, Pos[]] => {
+const findPath = (start: Pos): Pos[] => {
   const visited: Set<PosStr> = new Set()
-  const steps: Pos[] = []
 
-  const findPathHelp = (start: Pos): boolean => {
-    if (getTile(start) === Tile.Goal) return true
+  const findPathHelp = (start: Pos, steps: Pos[] = []): Pos[] => {
+    if (getTile(start) === Tile.Goal) return [...steps, start]
     const moves = neighbors(start).filter(p => allowed(p) && !visited.has(pos(p)))
     for (const p of moves) visited.add(pos(p))
-    return !!moves.find(p => findPathHelp(p) && steps.unshift(p))
+
+    return moves.reduce((s, p) => {
+      const found = findPathHelp(p, steps)
+      return found.length ? [p, ...found] : s
+    }, [] as Pos[])
   }
 
-  return [findPathHelp(start), steps]
+  return findPathHelp(start, [])
 }
 
 const App: Component = () => {
@@ -80,6 +83,7 @@ const App: Component = () => {
   let goalRef: HTMLDivElement = null!
 
   const [isRunning, setRunning] = createSignal(false)
+  const [sps, setSps] = createSignal(25)
 
   const handleMouse = (e: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => {
     e.preventDefault()
@@ -118,7 +122,7 @@ const App: Component = () => {
       <div>
         <div>
           <label>
-            Width:
+            Width:{' '}
             <input
               type="number"
               value={width()}
@@ -129,7 +133,7 @@ const App: Component = () => {
             />
           </label>
           <label>
-            Height:
+            Height:{' '}
             <input
               type="number"
               value={height()}
@@ -141,34 +145,65 @@ const App: Component = () => {
           </label>
         </div>
         <div>
-          <button onClick={resetGrid}>Reset grid</button>
+          <label>
+            Steps per Second:{' '}
+            <input
+              type="number"
+              value={sps()}
+              onInput={e => {
+                const sps = parseInt(e.currentTarget.value, 10)
+                if (!isNaN(sps)) setSps(sps)
+              }}
+            />
+          </label>
+        </div>
+        <div>
+          <button onClick={resetGrid} disabled={isRunning()}>
+            Reset grid
+          </button>
           <button
             onClick={() => {
               if (player()?.[0] !== 'Set' || goal()?.[0] !== 'Set') return
-              const [, steps] = findPath((player() as ['Set', Pos])[1])
+              const steps = findPath((player() as ['Set', Pos])[1])
+
+              if (steps.length === 0) return
+
+              setGridUsed(true)
 
               const walk = () => {
+                setRunning(true)
                 if (steps.length) {
-                  setRunning(true)
                   setTimeout(() => {
                     const pos = steps.shift()!
                     if (getTile(pos) !== Tile.Goal) setTile(pos, Tile.Path)
                     else setTile(pos, Tile.ReachedGoal)
                     walk()
-                  }, 50)
+                  }, sps())
                 } else setRunning(false)
               }
 
               walk()
             }}
-            disabled={isRunning() || player()[0] !== 'Set' || goal()[0] !== 'Set'}
+            disabled={isRunning() || player()[0] !== 'Set' || goal()[0] !== 'Set' || isGridUsed()}
           >
             Run
           </button>
         </div>
       </div>
       <div style={{ height: '32px', display: 'flex', gap: '32px' }}>
-        <Show when={player()?.[0] !== 'Set'}>
+        <Show
+          when={player()?.[0] !== 'Set'}
+          fallback={
+            <button
+              onClick={() => {
+                setTile((player() as ['Set', Pos])[1], Tile.Empty)
+                setPlayer('Unset')
+              }}
+            >
+              Reset Player
+            </button>
+          }
+        >
           <div
             onMouseDown={e => {
               setPlayer('Holding')
@@ -217,7 +252,19 @@ const App: Component = () => {
             />
           </div>
         </Show>
-        <Show when={goal()?.[0] !== 'Set'}>
+        <Show
+          when={goal()?.[0] !== 'Set'}
+          fallback={
+            <button
+              onClick={() => {
+                setTile((goal() as ['Set', Pos])[1], Tile.Empty)
+                setGoal('Unset')
+              }}
+            >
+              Reset Goal
+            </button>
+          }
+        >
           <div
             onMouseDown={e => {
               setGoal('Holding')
