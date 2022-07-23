@@ -80,7 +80,7 @@ const App: Component = () => {
 
   const handleMouse = (e: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => {
     e.preventDefault()
-    if (player()?.[0] !== 'Set' && goal()?.[0] !== 'Set') return
+    if (player()?.[0] !== 'Set' || goal()?.[0] !== 'Set') return
 
     const { top, left, width, height } = e.currentTarget.getBoundingClientRect()
     const { clientX: cx, clientY: cy } = e
